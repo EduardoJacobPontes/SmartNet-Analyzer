@@ -2,13 +2,13 @@
  * mapview.js — mapa SVG da cidade: bairros (vértices) e vias (arestas).
  *  - arrastar bairros, layout automático (força), vias curvas para mão dupla em grafos direcionados
  *  - estados visuais vindos dos algoritmos (visitado, atual, MST, rota…)
- *  - animação de veículo de emergência ao longo de uma rota
+ *  - carro que percorre as ruas (acompanha os algoritmos e despacha rotas de emergência)
  */
 (function (root) {
   'use strict';
   const { el, clear } = root.SmartNet;
 
-  const W = 1000, H = 640, R = 22, MARGIN = 48;
+  const W = 1000, H = 640, R = 24, MARGIN = 48;
   const NODE_STATES = ['current', 'visited', 'frontier', 'done', 'critical'];
   const EDGE_STATES = ['tree', 'considered', 'rejected', 'mst', 'path', 'back', 'critical'];
 
@@ -23,7 +23,7 @@
       this.source = null;
       this.target = null;
       this.drag = null;
-      this.vehicle = null;
+      this.car = null;
       this._seed = 7;
 
       svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -31,7 +31,11 @@
       this.gEdges = el('svg:g', { class: 'layer-edges' });
       this.gNodes = el('svg:g', { class: 'layer-nodes' });
       this.gFx = el('svg:g', { class: 'layer-fx' });
-      svg.append(this.gEdges, this.gNodes, this.gFx);
+      const defs = el('svg:defs', {},
+        el('svg:linearGradient', { id: 'beamGrad', x1: 0, y1: 0, x2: 1, y2: 0 },
+          el('svg:stop', { offset: '0', 'stop-color': '#fff3b0', 'stop-opacity': '.6' }),
+          el('svg:stop', { offset: '1', 'stop-color': '#fff3b0', 'stop-opacity': '0' })));
+      svg.append(defs, this.gEdges, this.gNodes, this.gFx);
 
       svg.addEventListener('pointermove', (e) => this._onMove(e));
       svg.addEventListener('pointerup', (e) => this._onUp(e));
@@ -132,15 +136,17 @@
 
       for (const e of g.edges) {
         const hit = el('svg:path', { class: 'edge-hit' });
+        const outline = el('svg:path', { class: 'road-curb' });
+        const asphalt = el('svg:path', { class: 'road-asphalt' });
         const line = el('svg:path', { class: 'edge-line' });
         const arrow = g.directed ? el('svg:polygon', { class: 'edge-arrow' }) : null;
         const bg = g.weighted ? el('svg:rect', { class: 'edge-label-bg', rx: 7, height: 18 }) : null;
         const txt = g.weighted ? el('svg:text', { class: 'edge-label', 'text-anchor': 'middle' }) : null;
         const title = el('svg:title');
-        const grp = el('svg:g', { class: 'edge', 'data-id': e.id }, title, hit, line, arrow, bg, txt);
+        const grp = el('svg:g', { class: 'edge', 'data-id': e.id }, title, outline, asphalt, line, hit, arrow, bg, txt);
         grp.addEventListener('click', () => this.h.onEdgeClick && this.h.onEdgeClick(e));
         this.gEdges.appendChild(grp);
-        this.edgeEls.set(e.id, { grp, hit, line, arrow, bg, txt, title, e });
+        this.edgeEls.set(e.id, { grp, hit, outline, asphalt, line, arrow, bg, txt, title, e });
       }
 
       for (const v of g.vertices()) {
@@ -174,10 +180,11 @@
       };
       const s = toward(a, c || b, R);
       const t = toward(b, c || a, pad);
-      const d = c ? `M${s.x},${s.y} Q${c.x},${c.y} ${t.x},${t.y}` : `M${s.x},${s.y} L${t.x},${t.y}`;
+      // a rua vai de centro a centro (os bairros ficam por cima); só a seta usa o ponto encurtado
+      const d = c ? `M${a.x},${a.y} Q${c.x},${c.y} ${b.x},${b.y}` : `M${a.x},${a.y} L${b.x},${b.y}`;
       const mid = c
-        ? { x: 0.25 * s.x + 0.5 * c.x + 0.25 * t.x, y: 0.25 * s.y + 0.5 * c.y + 0.25 * t.y }
-        : { x: (s.x + t.x) / 2, y: (s.y + t.y) / 2 };
+        ? { x: 0.25 * a.x + 0.5 * c.x + 0.25 * b.x, y: 0.25 * a.y + 0.5 * c.y + 0.25 * b.y }
+        : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       // direção da ponta da seta
       const from = c || s;
       const ang = Math.atan2(t.y - from.y, t.x - from.x);
@@ -185,10 +192,9 @@
     }
 
     updateGeometry() {
-      for (const { hit, line, arrow, bg, txt, title, e } of this.edgeEls.values()) {
+      for (const { hit, outline, asphalt, line, arrow, bg, txt, title, e } of this.edgeEls.values()) {
         const gm = this._geom(e);
-        hit.setAttribute('d', gm.d);
-        line.setAttribute('d', gm.d);
+        [hit, outline, asphalt, line].forEach((p) => p.setAttribute('d', gm.d));
         if (arrow) {
           const L = 11, Wd = 5.5, { t, ang } = gm;
           const p = (back, side) => `${t.x - Math.cos(ang) * back - Math.sin(ang) * side},${t.y - Math.sin(ang) * back + Math.cos(ang) * side}`;
@@ -210,6 +216,12 @@
       for (const [v, { grp }] of this.nodeEls) {
         const p = this.pos.get(v);
         grp.setAttribute('transform', `translate(${p.x},${p.y})`);
+      }
+      const car = this.car;
+      if (car && !car.raf && car.node && this.pos.has(car.node)) {
+        const p = this.pos.get(car.node);
+        car.x = p.x; car.y = p.y;
+        this._paintCar();
       }
     }
 
@@ -285,53 +297,153 @@
       if (!d.moved && this.h.onNodeClick) this.h.onNodeClick(d.v);
     }
 
-    /* ---------- veículo de emergência ---------- */
+    /* ---------- carro ---------- */
+    _makeCar() {
+      const g = el('svg:g', { class: 'car' },
+        el('svg:polygon', { class: 'car-beam', points: '16,-5 66,-20 66,20 16,5' }),
+        el('svg:rect', { class: 'car-shadow', x: -17, y: -7, width: 36, height: 18, rx: 6 }),
+        el('svg:rect', { class: 'car-body', x: -17, y: -9, width: 34, height: 18, rx: 6 }),
+        el('svg:rect', { class: 'car-glass', x: 1, y: -7, width: 9, height: 14, rx: 2.5 }),
+        el('svg:rect', { class: 'car-roof', x: -9, y: -7, width: 10, height: 14, rx: 2.5 }),
+        el('svg:rect', { class: 'car-glass', x: -13, y: -6, width: 3, height: 12, rx: 1.5 }),
+        el('svg:circle', { class: 'car-head', cx: 16, cy: -6, r: 2.2 }),
+        el('svg:circle', { class: 'car-head', cx: 16, cy: 6, r: 2.2 }),
+        el('svg:rect', { class: 'car-tail', x: -18, y: -7.5, width: 2.4, height: 4.5, rx: 1 }),
+        el('svg:rect', { class: 'car-tail', x: -18, y: 3, width: 2.4, height: 4.5, rx: 1 }),
+        el('svg:rect', { class: 'car-siren a', x: -6, y: -7, width: 4, height: 6, rx: 1 }),
+        el('svg:rect', { class: 'car-siren b', x: -6, y: 1, width: 4, height: 6, rx: 1 }));
+      this.gFx.appendChild(g);
+      return g;
+    }
+
+    _paintCar() {
+      const c = this.car;
+      if (c) c.g.setAttribute('transform', `translate(${c.x},${c.y}) rotate(${(c.angle * 180) / Math.PI})`);
+    }
+
+    /** Remove o carro e o rastro. */
     stopVehicle() {
-      if (this.vehicle) {
-        cancelAnimationFrame(this.vehicle.raf);
-        const { resolve } = this.vehicle;
-        this.vehicle = null;
-        resolve(false);
+      if (this.car) {
+        cancelAnimationFrame(this.car.raf);
+        const { resolve } = this.car;
+        this.car = null;
+        if (resolve) resolve(false);
       }
       clear(this.gFx);
     }
 
-    /** Anima 🚑 sobre os centros dos bairros da rota. Retorna uma Promise (resolve ao chegar ou ser cancelada). */
-    driveAlong(path, { speed = 240, icon = '🚑' } = {}) {
-      this.stopVehicle();
-      const pts = path.map((v) => this.pos.get(v)).filter(Boolean);
-      if (pts.length < 2) return Promise.resolve(false);
+    /** Menor rota em número de ruas (ignora sentido e vias interditadas) — só para o carro se deslocar. */
+    routeBetween(a, b) {
+      if (a === b) return [a];
+      const adj = root.SmartNet.undirectedView(this.graph);
+      if (!adj.has(a) || !adj.has(b)) return null;
+      const prev = new Map([[a, null]]);
+      const q = [a];
+      for (let h = 0; h < q.length; h++) {
+        for (const { to } of adj.get(q[h])) {
+          if (prev.has(to)) continue;
+          prev.set(to, q[h]);
+          if (to === b) {
+            const out = [];
+            for (let c = b; c !== null; c = prev.get(c)) out.push(c);
+            return out.reverse();
+          }
+          q.push(to);
+        }
+      }
+      return null;
+    }
+
+    /** Interrompe a perna em andamento e estaciona o carro no destino dela. */
+    _settleCar() {
+      const c = this.car;
+      if (!c || !c.raf) return;
+      cancelAnimationFrame(c.raf);
+      c.raf = 0;
+      const { resolve } = c;
+      c.resolve = null;
+      const p = c.node && this.pos.get(c.node);
+      if (p) { c.x = p.x; c.y = p.y; }
+      this._paintCar();
+      if (resolve) resolve(false);
+    }
+
+    /** Coloca o carro (sem animar) sobre um bairro. */
+    placeCar(node, { emergency = false } = {}) {
+      if (!this.pos.has(node)) return;
+      if (!this.car) {
+        clear(this.gFx);
+        this.car = { g: this._makeCar(), x: 0, y: 0, angle: -Math.PI / 2, node, raf: 0, resolve: null };
+      }
+      this._settleCar();
+      const c = this.car, p = this.pos.get(node);
+      c.x = p.x; c.y = p.y; c.node = node;
+      c.g.classList.toggle('emergency', emergency);
+      this._paintCar();
+    }
+
+    /** Leva o carro até um bairro pelas ruas do grafo. Cria o carro se necessário. */
+    carTo(node, ms = 700) {
+      if (!this.pos.has(node)) return Promise.resolve(false);
+      if (!this.car) { this.placeCar(node); return Promise.resolve(true); }
+      this._settleCar();
+      const route = this.routeBetween(this.car.node, node);
+      if (!route) { this.placeCar(node); return Promise.resolve(false); }
+      return this.driveRoute(route, { duration: ms });
+    }
+
+    /**
+     * Dirige o carro ao longo de uma lista de bairros.
+     * opts.speed: px/s (se não houver duration) · opts.emergency: sirene + rastro
+     */
+    driveRoute(nodes, { speed = 260, duration = null, emergency = false } = {}) {
+      const pts = nodes.map((v) => this.pos.get(v)).filter(Boolean);
+      if (pts.length < 2) { if (nodes.length) this.placeCar(nodes[0], { emergency }); return Promise.resolve(true); }
+      if (!this.car) this.placeCar(nodes[0], { emergency });
+      this._settleCar();
+      const car = this.car;
+      car.g.classList.toggle('emergency', emergency);
       const segs = [];
       let total = 0;
       for (let i = 0; i < pts.length - 1; i++) {
         const l = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
         segs.push(l); total += l;
       }
-      const trail = el('svg:polyline', { class: 'vehicle-trail', points: '' });
-      const car = el('svg:text', { class: 'vehicle', 'text-anchor': 'middle', 'dominant-baseline': 'central' }, icon);
-      const halo = el('svg:circle', { class: 'vehicle-halo', r: 17 });
-      this.gFx.append(trail, halo, car);
+      const trail = emergency ? el('svg:polyline', { class: 'car-trail', points: '' }) : null;
+      if (trail) this.gFx.insertBefore(trail, car.g);
+      const dur = duration || Math.max(900, (total / speed) * 1000);
+      const start = performance.now();
+      let last = start;
+      const turn = (from, to) => {
+        let d = to - from;
+        while (d > Math.PI) d -= 2 * Math.PI;
+        while (d < -Math.PI) d += 2 * Math.PI;
+        return d;
+      };
 
       return new Promise((resolve) => {
-        const start = performance.now();
-        const dur = Math.max(900, (total / speed) * 1000);
-        const state = { raf: 0, resolve };
-        this.vehicle = state;
+        car.resolve = resolve;
+        car.node = nodes[nodes.length - 1]; // destino da perna atual (usado se for interrompida)
         const frame = (now) => {
-          const k = Math.min(1, (now - start) / dur);
+          if (this.car !== car) return;
+          const lin = Math.min(1, (now - start) / dur);
+          // viagens longas arrancam e freiam suavemente; passos do algoritmo seguem velocidade constante
+          const k = duration ? lin : 0.5 - 0.5 * Math.cos(Math.PI * lin);
           let dist = k * total, i = 0;
           while (i < segs.length - 1 && dist > segs[i]) { dist -= segs[i]; i++; }
           const f = segs[i] ? dist / segs[i] : 1;
-          const x = pts[i].x + (pts[i + 1].x - pts[i].x) * f;
-          const y = pts[i].y + (pts[i + 1].y - pts[i].y) * f;
-          car.setAttribute('x', x); car.setAttribute('y', y);
-          halo.setAttribute('cx', x); halo.setAttribute('cy', y);
-          const done = [...pts.slice(0, i + 1), { x, y }];
-          trail.setAttribute('points', done.map((p) => `${p.x},${p.y}`).join(' '));
-          if (k < 1 && this.vehicle === state) state.raf = requestAnimationFrame(frame);
-          else { if (this.vehicle === state) this.vehicle = null; resolve(k >= 1); }
+          car.x = pts[i].x + (pts[i + 1].x - pts[i].x) * f;
+          car.y = pts[i].y + (pts[i + 1].y - pts[i].y) * f;
+          const want = Math.atan2(pts[i + 1].y - pts[i].y, pts[i + 1].x - pts[i].x);
+          const dt = Math.min(0.05, (now - last) / 1000);
+          car.angle += turn(car.angle, want) * (lin === 0 ? 1 : Math.min(1, dt * 14));
+          last = now;
+          this._paintCar();
+          if (trail) trail.setAttribute('points', [...pts.slice(0, i + 1), { x: car.x, y: car.y }].map((p) => `${p.x},${p.y}`).join(' '));
+          if (lin < 1) car.raf = requestAnimationFrame(frame);
+          else { car.raf = 0; car.resolve = null; resolve(true); }
         };
-        state.raf = requestAnimationFrame(frame);
+        car.raf = requestAnimationFrame(frame);
       });
     }
   }

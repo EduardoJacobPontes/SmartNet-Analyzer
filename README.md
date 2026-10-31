@@ -61,7 +61,9 @@ Separadores: espaço, vírgula ou ponto-e-vírgula. Erros são listados por linh
 
 ## Funcionalidades extras
 - **Interditar vias:** feche ruas no mapa; todos os algoritmos ignoram vias fechadas e **recalculam na hora** (rota de ambulância desvia, a fibra é reprojetada).
-- **Despachar veículo 🚑:** anima a rota de emergência do Dijkstra no mapa.
+- **Carro percorrendo o grafo:** a cada passo do DFS/BFS/Dijkstra um carro dirige pelas ruas até o bairro atual (inclusive as voltas do DFS), com faróis e curvas.
+- **Despachar viatura 🚨:** a viatura (sirene piscando) percorre a rota de emergência do Dijkstra, deixando rastro no mapa.
+- **Malha viária:** vias desenhadas como ruas de asfalto com faixa central; interditadas ficam com barreira vermelha.
 - **Análise de resiliência (Tarjan):** bairros e vias cuja falha isola parte da cidade (pontos de articulação e pontes) com o impacto de cada falha.
 - Player passo a passo com destaque no mapa e na linha da lista de adjacência.
 - Escolha entre ordem de cadastro ou alfabética dos vizinhos (DFS/BFS).

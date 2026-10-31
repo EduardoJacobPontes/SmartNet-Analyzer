@@ -20,7 +20,7 @@
     },
     dijkstra: {
       name: 'Dijkstra', title: 'Dijkstra', icon: 'i-dijkstra', theme: 'Rota de emergência',
-      desc: 'Menor tempo de ambulâncias e bombeiros da origem até todos os bairros. Escolha um destino para destacar a rota e despachar o veículo.',
+      desc: 'Menor tempo de ambulâncias e bombeiros da origem até todos os bairros. Escolha um destino para destacar a rota e despachar a viatura.',
       source: true, target: true, run: (g, p) => S.dijkstra(g, p.source, { target: p.target || null }), cx: 'O((V+E)log V)',
     },
     kruskal: {
@@ -429,6 +429,7 @@
     $('stepCount').textContent = `Passo ${run.idx + 1} de ${run.res.steps.length}`;
     $('progressBar').style.width = `${((run.idx + 1) / run.res.steps.length) * 100}%`;
     S.highlightMemory($('memoryBody'), step.current);
+    if (step.current) view.carTo(step.current, run.playing ? Number($('selSpeed').value) * 0.85 : 520);
     updatePlayer();
   }
 
@@ -482,9 +483,10 @@
     goTo(run.res.steps.length - 1);
     const btn = $('btnDispatch');
     btn.disabled = true;
-    view.driveAlong(run.res.targetPath).then((arrived) => {
+    view.placeCar(run.res.targetPath[0], { emergency: true });
+    view.driveRoute(run.res.targetPath, { speed: 230, emergency: true }).then((arrived) => {
       btn.disabled = false;
-      if (arrived) toast(`🚑 Veículo chegou a ${run.res.target}: ${run.res.targetPath.length - 1} trecho(s), custo ${fmt(run.res.targetCost)}.`, 'ok');
+      if (arrived) toast(`🚨 Viatura chegou a ${run.res.target}: ${run.res.targetPath.length - 1} trecho(s), custo ${fmt(run.res.targetCost)}.`, 'ok');
     });
   }));
 
