@@ -63,6 +63,8 @@ Separadores: espaço, vírgula ou ponto-e-vírgula. Erros são listados por linh
 - **Interditar vias:** feche ruas no mapa; todos os algoritmos ignoram vias fechadas e **recalculam na hora** (rota de ambulância desvia, a fibra é reprojetada).
 - **Carro percorrendo o grafo:** a cada passo do DFS/BFS/Dijkstra um carro dirige pelas ruas até o bairro atual (inclusive as voltas do DFS), com faróis e curvas.
 - **Despachar viatura 🚨:** a viatura (sirene piscando) percorre a rota de emergência do Dijkstra, deixando rastro no mapa.
+- **Cidadezinha vista de cima:** o mapa é ambientado com árvores, casas, prédios, lagos e gramado ao redor das ruas (decorativos; os bairros são as rotatórias).
+- **Central de operações:** cada resultado começa por um veredito em linguagem simples, com abas (Resumo, detalhes, Complexidade) e um diário de bordo clicável com todos os passos.
 - **Malha viária:** vias desenhadas como ruas de asfalto com faixa central; interditadas ficam com barreira vermelha.
 - **Análise de resiliência (Tarjan):** bairros e vias cuja falha isola parte da cidade (pontos de articulação e pontes) com o impacto de cada falha.
 - Player passo a passo com destaque no mapa e na linha da lista de adjacência.

@@ -177,27 +177,40 @@ C                  # um nome só = bairro</pre>
 
       <!-- 4 · RESULTADOS -->
       <section class="panel" id="sec-results" aria-labelledby="h-res">
-        <header class="panel-head"><span class="step-no">4</span><div><h2 id="h-res">Execução e resultados</h2><p id="resSub">Aguardando execução.</p></div></header>
+        <header class="panel-head"><span class="step-no">4</span><div><h2 id="h-res">Central de operações</h2><p id="resSub">Aguardando execução.</p></div></header>
 
-        <div class="player" id="player" aria-label="Controles de reprodução">
-          <div class="player-btns">
-            <button class="icon-btn" id="pFirst" type="button" title="Início" aria-label="Início"><svg><use href="#i-first"/></svg></button>
-            <button class="icon-btn" id="pPrev" type="button" title="Passo anterior" aria-label="Passo anterior"><svg><use href="#i-prev"/></svg></button>
-            <button class="icon-btn icon-btn-main" id="pPlay" type="button" title="Reproduzir" aria-label="Reproduzir"><svg><use href="#i-play"/></svg></button>
-            <button class="icon-btn" id="pNext" type="button" title="Próximo passo" aria-label="Próximo passo"><svg><use href="#i-next"/></svg></button>
-            <button class="icon-btn" id="pLast" type="button" title="Ver final" aria-label="Ver final"><svg><use href="#i-last"/></svg></button>
+        <div class="res-grid">
+          <div class="res-left">
+            <h3 class="col-title">Diário de bordo</h3>
+            <div class="player" id="player" aria-label="Controles de reprodução">
+              <div class="player-btns">
+                <button class="icon-btn" id="pFirst" type="button" title="Início" aria-label="Início"><svg><use href="#i-first"/></svg></button>
+                <button class="icon-btn" id="pPrev" type="button" title="Passo anterior" aria-label="Passo anterior"><svg><use href="#i-prev"/></svg></button>
+                <button class="icon-btn icon-btn-main" id="pPlay" type="button" title="Reproduzir" aria-label="Reproduzir"><svg><use href="#i-play"/></svg></button>
+                <button class="icon-btn" id="pNext" type="button" title="Próximo passo" aria-label="Próximo passo"><svg><use href="#i-next"/></svg></button>
+                <button class="icon-btn" id="pLast" type="button" title="Ver final" aria-label="Ver final"><svg><use href="#i-last"/></svg></button>
+                <label class="speed"><span class="sr-only">Velocidade</span>
+                  <select id="selSpeed" aria-label="Velocidade"><option value="1600">Lenta</option><option value="900" selected>Normal</option><option value="400">Rápida</option></select>
+                </label>
+              </div>
+              <div class="player-info">
+                <div class="step-count" id="stepCount">Passo –</div>
+                <div class="progress"><i id="progressBar"></i></div>
+              </div>
+            </div>
+            <div class="now-card" id="stepBox">
+              <span class="now-tag">Agora</span>
+              <p id="stepMsg">Escolha um algoritmo e execute para acompanhar o carro passo a passo.</p>
+              <dl id="stepAux"></dl>
+            </div>
+            <ol class="timeline" id="stepLog" aria-label="Todos os passos"></ol>
           </div>
-          <label class="field speed"><span>Velocidade</span>
-            <select id="selSpeed"><option value="1600">Lenta</option><option value="900" selected>Normal</option><option value="400">Rápida</option></select>
-          </label>
-          <div class="player-info">
-            <div class="step-count" id="stepCount">Passo –</div>
-            <div class="progress"><i id="progressBar"></i></div>
+
+          <div class="res-right">
+            <h3 class="col-title">Resultado</h3>
+            <div id="resultBody" class="result-body"><div class="empty-mini">Nenhum resultado ainda.</div></div>
           </div>
         </div>
-        <div class="step-box" id="stepBox"><p id="stepMsg">Escolha um algoritmo e execute para ver o passo a passo aqui.</p><dl id="stepAux"></dl></div>
-
-        <div id="resultBody" class="result-body"><div class="empty-mini">Nenhum resultado ainda.</div></div>
       </section>
 
       <!-- 5 · MEMÓRIA -->

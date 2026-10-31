@@ -369,8 +369,9 @@
     view.applyState({});
     mount($('resultBody'), el('div', { class: 'empty-mini' }, 'Nenhum resultado ainda. Escolha um algoritmo e execute.'));
     $('resSub').textContent = 'Aguardando execução.';
-    $('stepMsg').textContent = 'Escolha um algoritmo e execute para ver o passo a passo aqui.';
+    $('stepMsg').textContent = 'Escolha um algoritmo e execute para acompanhar o carro passo a passo.';
     mount($('stepAux'));
+    mount($('stepLog'));
     $('stepCount').textContent = 'Passo –';
     $('progressBar').style.width = '0%';
     $('btnDispatch').hidden = true;
@@ -399,7 +400,9 @@
     state.run = { res, idx: 0, timer: null, playing: false, algo: key, params };
     state.runCount++;
     mount($('resultBody'), S.renderResult(res, g));
-    $('resSub').textContent = res.ok ? `${a.title} · ${a.theme}` : 'A execução não pôde ser concluída.';
+    mount($('stepLog'), res.ok ? res.steps.map((st, i) => el('li', {},
+      el('button', { type: 'button', onclick: () => { stopPlay(); goTo(i); } }, el('i', {}, i + 1), el('span', {}, st.msg)))) : []);
+    $('resSub').textContent = res.ok ? `${a.title} · ${a.theme} · origem ${res.source ?? '—'}` : 'A execução não pôde ser concluída.';
     $('btnDispatch').hidden = !(res.ok && res.algo === 'dijkstra' && res.targetPath && res.targetPath.length > 1);
 
     if (!res.ok) {
@@ -414,7 +417,6 @@
     const auto = $('chkAuto').checked && replay && res.steps.length > 1;
     goTo(auto ? 0 : res.steps.length - 1);
     if (auto) play();
-    if (replay) $('sec-results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   /* ---------- player ---------- */
@@ -429,6 +431,13 @@
     $('stepCount').textContent = `Passo ${run.idx + 1} de ${run.res.steps.length}`;
     $('progressBar').style.width = `${((run.idx + 1) / run.res.steps.length) * 100}%`;
     S.highlightMemory($('memoryBody'), step.current);
+    const log = $('stepLog');
+    [...log.children].forEach((li, k) => li.classList.toggle('active', k === run.idx));
+    const act = log.children[run.idx];
+    if (act) { // rola só a lista (não a página)
+      const top = act.offsetTop; // a lista é o offsetParent
+      if (top < log.scrollTop || top + act.offsetHeight > log.scrollTop + log.clientHeight) log.scrollTop = Math.max(0, top - 40);
+    }
     if (step.current) view.carTo(step.current, run.playing ? Number($('selSpeed').value) * 0.85 : 520);
     updatePlayer();
   }

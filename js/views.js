@@ -1,5 +1,5 @@
 /*
- * views.js — renderização dos resultados dos algoritmos e da "visão da memória".
+ * views.js — resultados dos algoritmos (veredito + abas) e "visão da memória".
  */
 (function (root) {
   'use strict';
@@ -18,9 +18,39 @@
   }
 
   const kpi = (label, value, kind = '') => el('div', { class: `kpi ${kind}` }, el('span', { class: 'kpi-value' }, value), el('span', { class: 'kpi-label' }, label));
-  const block = (title, ...body) => el('section', { class: 'rblock' }, el('h4', {}, title), body);
+  const kpis = (...items) => el('div', { class: 'kpis' }, items);
   const chips = (list) => el('div', { class: 'chips' }, list.map((v, i) => el('span', { class: 'chip' }, el('i', {}, i + 1), v)));
   const note = (text, kind = 'info') => el('div', { class: `note note-${kind}` }, text);
+  const section = (title, hint, ...body) => el('section', { class: 'rblock' },
+    el('h4', {}, title), hint ? el('p', { class: 'hint' }, hint) : null, body);
+
+  /** Cartão de veredito: a resposta em uma frase, antes de qualquer tabela. */
+  function verdict(kind, title, text) {
+    const icon = { ok: '✔', warn: '!', bad: '✕', info: 'i' }[kind];
+    return el('div', { class: `verdict verdict-${kind}` },
+      el('span', { class: 'verdict-icon', 'aria-hidden': 'true' }, icon),
+      el('div', {}, el('strong', {}, title), el('p', {}, text)));
+  }
+
+  /** Rota "O › A › B" em etiquetas. */
+  const route = (path) => el('div', { class: 'route' },
+    path.flatMap((v, i) => [i ? el('span', { class: 'route-sep' }, '›') : null, el('span', { class: 'route-stop' }, v)]));
+
+  /** Abas simples e acessíveis. items: [{ label, node }] */
+  function tabs(items) {
+    const bar = el('div', { class: 'rtabs', role: 'tablist' });
+    const panes = [];
+    const btns = [];
+    items.forEach((it, i) => {
+      const pane = el('div', { class: 'rpane', role: 'tabpanel', hidden: i !== 0 }, it.node);
+      const btn = el('button', { type: 'button', role: 'tab', 'aria-selected': String(i === 0) }, it.label);
+      btn.addEventListener('click', () => {
+        btns.forEach((b, j) => { b.setAttribute('aria-selected', String(j === i)); panes[j].hidden = j !== i; });
+      });
+      btns.push(btn); panes.push(pane); bar.appendChild(btn);
+    });
+    return el('div', { class: 'rtabs-wrap' }, bar, panes);
+  }
 
   function complexity(c) {
     return el('div', { class: 'complexity' },
@@ -31,113 +61,168 @@
 
   /* ---------- DFS ---------- */
   function renderDfs(r, g) {
-    const rows = r.visitOrder.map((v) => [v, r.disc.get(v), r.fin.get(v), r.parent.get(v) ?? '—']);
     const kinds = r.kinds.filter((k) => k.kind !== 'árvore');
-    return el('div', { class: 'result' },
-      el('div', { class: 'kpis' },
+    const allReached = !r.unreachable.length;
+
+    const v = r.connected
+      ? verdict('ok', 'Rede conexa', `O carro saiu de ${r.source} e chegou a todos os ${r.visitOrder.length} bairros: qualquer bairro alcança qualquer outro.`)
+      : verdict('warn', `Rede dividida em ${r.components.length} ilhas`, `Ilhas sem ligação entre si: ${r.components.map((c) => `{${c.join(', ')}}`).join(' · ')}.`);
+
+    const resumo = el('div', { class: 'result' }, v,
+      g.directed && !allReached ? note(`Respeitando o sentido das ruas, ${r.source} não alcança: ${r.unreachable.join(', ')}.`, 'warn') : null,
+      kpis(
         kpi('bairros visitados', r.visitOrder.length),
-        kpi(g.directed ? 'componentes (ignorando sentido)' : 'componentes conexos', r.components.length, r.connected ? 'good' : 'warn'),
+        kpi(g.directed ? 'ilhas (sem contar sentido)' : 'ilhas', r.components.length, r.connected ? 'good' : 'warn'),
         kpi('becos sem saída', r.deadEnds.length, r.deadEnds.length ? 'warn' : 'good'),
-        kpi('ciclos', r.hasCycle ? 'sim' : 'não')),
-      r.connected
-        ? note('Rede conexa: todos os bairros podem se comunicar.', 'ok')
-        : note(`Rede desconexa: ${r.components.length} ilhas isoladas — ${r.components.map((c) => `{${c.join(', ')}}`).join(' · ')}.`, 'warn'),
-      r.unreachable.length && r.connected === false
-        ? note(`A partir de ${r.source} não se chega a: ${r.unreachable.join(', ')}.`, 'warn')
-        : (g.directed && r.unreachable.length ? note(`Respeitando o sentido das vias, ${r.source} não alcança: ${r.unreachable.join(', ')}.`, 'warn') : null),
-      block('Ordem de visitação', chips(r.visitOrder)),
-      block(r.trees.length > 1 ? 'Floresta DFS' : 'Árvore DFS', r.trees.map((t) => el('pre', { class: 'tree' }, t.lines.join('\n')))),
-      block('Tempos de descoberta / término', table(['Bairro', 'Descoberta', 'Término', 'Pai'], rows)),
-      block('Becos sem saída e vértices isolados',
+        kpi('ruas em ciclo', r.hasCycle ? 'sim' : 'não')),
+      section('Trajeto do carro', 'Ordem em que os bairros foram visitados.', chips(r.visitOrder)),
+      section('Becos sem saída', 'Bairros onde a rua termina (sem continuação).',
         r.deadEnds.length || r.isolated.length
           ? el('ul', { class: 'plain' },
             r.deadEnds.map((d) => el('li', {}, badge(d.v, 'warn'), ' ', d.kind)),
-            r.isolated.map((v) => el('li', {}, badge(v, 'bad'), ' isolado (sem nenhuma via ativa)')))
-          : note('Nenhum beco sem saída encontrado.', 'ok')),
-      kinds.length ? block('Arestas não-árvore', table(['De', 'Para', 'Classificação'], kinds.map((k) => [k.from, k.to, k.kind]))) : null,
-      block('Complexidade', complexity(r.complexity)));
+            r.isolated.map((x) => el('li', {}, badge(x, 'bad'), ' isolado: nenhuma rua ativa chega até ele')))
+          : note('Nenhum beco sem saída: todo bairro tem pelo menos duas ruas.', 'ok')),
+      r.hasCycle ? note('Há ciclos: alguns bairros têm mais de um caminho entre si (redundância útil em emergências).', 'info') : null);
+
+    const arvore = el('div', { class: 'result' },
+      section(r.trees.length > 1 ? 'Floresta DFS' : 'Caminho percorrido (árvore DFS)',
+        'Cada ramo é uma rua usada para descer; o carro só volta quando não há mais para onde ir.',
+        r.trees.map((t) => el('pre', { class: 'tree' }, t.lines.join('\n')))),
+      kinds.length ? section('Ruas que fecham ciclos', 'Arestas que não entraram na árvore.', table(['De', 'Para', 'Tipo'], kinds.map((k) => [k.from, k.to, k.kind]))) : null);
+
+    const tempos = el('div', { class: 'result' },
+      section('Relógio da busca', 'Chegada = quando o carro entrou no bairro · Saída = quando terminou de explorar tudo a partir dele.',
+        table(['Bairro', 'Chegada', 'Saída', 'Veio de'], r.visitOrder.map((x) => [x, r.disc.get(x), r.fin.get(x), r.parent.get(x) ?? '—']))));
+
+    return tabs([
+      { label: 'Resumo', node: resumo }, { label: 'Árvore', node: arvore },
+      { label: 'Relógio', node: tempos }, { label: 'Complexidade', node: complexity(r.complexity) }]);
   }
 
   /* ---------- BFS ---------- */
   function renderBfs(r) {
     const maxHop = r.levels.length - 1;
-    return el('div', { class: 'result' },
-      el('div', { class: 'kpis' },
+    const v = r.unreached.length
+      ? verdict('warn', 'Alerta não chega a todos', `Sem alcance a partir de ${r.source}: ${r.unreached.join(', ')}.`)
+      : verdict('ok', 'Alerta cobre toda a cidade', `A onda sai de ${r.source} e alcança os ${r.visitOrder.length} bairros em até ${maxHop} salto(s).`);
+
+    const resumo = el('div', { class: 'result' }, v,
+      kpis(
         kpi('bairros alcançados', r.visitOrder.length),
         kpi('saltos até o mais distante', maxHop),
         kpi('fora de alcance', r.unreached.length, r.unreached.length ? 'warn' : 'good')),
-      r.unreached.length ? note(`O alerta não chega a: ${r.unreached.join(', ')}.`, 'warn') : note('O alerta alcança todos os bairros.', 'ok'),
-      block('Ordem de visita (fila de execução)', chips(r.visitOrder)),
-      block('Níveis da onda', table(['Saltos', 'Bairros'], r.levels.map((l, i) => [i, l.join(', ')]))),
-      block('Registro da fila', table(['Passo', 'Desenfileira', 'Enfileira', 'Fila após o passo'],
-        r.log.map((l) => [l.step, l.dequeued ?? '—', l.enqueued.join(', ') || '—', l.queue.length ? `[ ${l.queue.join(', ')} ]` : '[ ]']))),
-      block('Menor caminho em saltos', table(['Bairro', 'Saltos', 'Pai'],
-        r.visitOrder.map((v) => [v, r.hops.get(v), r.parent.get(v) ?? '—']))),
-      block('Complexidade', complexity(r.complexity)));
+      section('Ondas de alerta', 'Cada onda é o conjunto de bairros a um salto a mais da origem.',
+        el('ol', { class: 'waves' }, r.levels.map((l, i) => el('li', {},
+          el('span', { class: 'wave-no' }, i === 0 ? 'origem' : `${i} salto${i > 1 ? 's' : ''}`),
+          el('div', { class: 'wave-bar', style: `--n:${i}` }),
+          el('div', { class: 'chips' }, l.map((x) => el('span', { class: 'chip chip-plain' }, x))))))),
+      section('Ordem de visita (fila)', null, chips(r.visitOrder)));
+
+    const fila = el('div', { class: 'result' },
+      section('Registro da fila', 'A cada passo sai um bairro da frente e entram seus vizinhos novos no fim.',
+        table(['Passo', 'Sai da fila', 'Entram', 'Fila depois'],
+          r.log.map((l) => [l.step, l.dequeued ?? '—', l.enqueued.join(', ') || '—', l.queue.length ? `[ ${l.queue.join(', ')} ]` : '[ ]']))));
+
+    const saltos = el('div', { class: 'result' },
+      section('Menor caminho em saltos', 'Pai = bairro por onde o alerta chegou.',
+        table(['Bairro', 'Saltos', 'Pai'], r.visitOrder.map((x) => [x, r.hops.get(x), r.parent.get(x) ?? '—']))));
+
+    return tabs([
+      { label: 'Resumo', node: resumo }, { label: 'Fila', node: fila },
+      { label: 'Saltos', node: saltos }, { label: 'Complexidade', node: complexity(r.complexity) }]);
   }
 
   /* ---------- Dijkstra ---------- */
   function renderDijkstra(r) {
-    return el('div', { class: 'result' },
-      el('div', { class: 'kpis' },
+    const reach = r.rows.filter((x) => x.reachable);
+    const max = Math.max(1, ...reach.map((x) => x.dist));
+    let v;
+    if (r.target && r.targetPath) v = verdict('ok', `Rota mais rápida até ${r.target}: custo ${fmt(r.targetCost)}`, `${r.targetPath.length - 1} trecho(s) saindo de ${r.source}.`);
+    else if (r.target) v = verdict('bad', `Sem rota até ${r.target}`, `Não há caminho de ${r.source} até ${r.target} (vias interditadas ou bairros desconectados).`);
+    else v = verdict('ok', `Menores custos a partir de ${r.source}`, `Calculado para ${reach.length} bairro(s). Escolha um destino para destacar a rota e despachar a viatura.`);
+
+    const resumo = el('div', { class: 'result' }, v,
+      r.targetPath ? section('Rota de emergência', null, route(r.targetPath)) : null,
+      r.unreachable.length ? note(`Sem rota a partir de ${r.source}: ${r.unreachable.join(', ')}.`, 'warn') : null,
+      kpis(
         kpi('origem', r.source),
-        kpi('bairros alcançáveis', r.rows.filter((x) => x.reachable).length),
+        kpi('bairros alcançáveis', reach.length),
         r.targetPath ? kpi(`custo até ${r.target}`, fmt(r.targetCost), 'good') : kpi('inalcançáveis', r.unreachable.length, r.unreachable.length ? 'warn' : 'good')),
-      r.target && !r.targetPath ? note(`Não existe rota de ${r.source} até ${r.target} (vias interditadas ou grafo desconexo).`, 'bad') : null,
-      r.targetPath ? note(`Rota de emergência: ${r.targetPath.join(' → ')} · custo ${fmt(r.targetCost)}.`, 'ok') : null,
-      r.unreachable.length ? note(`Sem rota a partir de ${r.source}: ${r.unreachable.join(', ')} (distância ∞).`, 'warn') : null,
-      block('Distâncias mínimas e predecessores',
+      section('Tempo até cada bairro', 'Barra proporcional ao custo mínimo.',
+        el('ul', { class: 'bars' }, r.rows.map((x) => el('li', { class: `${!x.reachable ? 'off' : ''}${x.v === r.target ? ' hl' : ''}` },
+          el('span', { class: 'bar-name' }, x.v),
+          el('div', { class: 'bar-track' }, x.reachable ? el('i', { style: `width:${Math.max(2, (x.dist / max) * 100)}%` }) : null),
+          el('span', { class: 'bar-val' }, x.reachable ? fmt(x.dist) : '∞'))))));
+
+    const tabela = el('div', { class: 'result' },
+      section('Distâncias mínimas e predecessores', 'Predecessor = bairro anterior na melhor rota.',
         table(['Destino', 'Distância', 'Predecessor', 'Caminho'],
           r.rows.map((x) => [x.v, x.reachable ? fmt(x.dist) : '∞', x.pred ?? '—', x.path ? x.path.join(' → ') : 'sem rota']),
           { rowClass: (i) => (!r.rows[i].reachable ? 'muted' : r.rows[i].v === r.target ? 'hl' : '') })),
-      block('Ordem em que as distâncias foram fixadas', chips(r.settleOrder)),
-      block('Complexidade', complexity(r.complexity)));
+      section('Ordem de fixação', 'Bairros em ordem crescente de distância.', chips(r.settleOrder)));
+
+    return tabs([
+      { label: 'Resumo', node: resumo }, { label: 'Tabela', node: tabela },
+      { label: 'Complexidade', node: complexity(r.complexity) }]);
   }
 
   /* ---------- Kruskal ---------- */
   function renderKruskal(r, g) {
-    return el('div', { class: 'result' },
-      el('div', { class: 'kpis' },
-        kpi('custo total da fibra', fmt(r.total), 'good'),
-        kpi('arestas na MST', r.chosen.length),
-        kpi('arestas descartadas', r.table.filter((t) => t.status === 'rejeitada').length)),
-      r.spanning ? note('Todos os bairros foram interligados sem redundância.', 'ok')
-        : note(`Grafo desconexo: não existe árvore única. Resultado é uma floresta com ${r.componentCount} componentes.`, 'warn'),
-      r.treatedAsUndirected ? note('Grafo direcionado: o Kruskal considera as vias sem sentido (MST é conceito de grafos não-direcionados).', 'info') : null,
-      block('Arestas selecionadas (rede de fibra)',
+    const v = r.spanning
+      ? verdict('ok', `Rede de fibra pronta: custo total ${fmt(r.total)}`, `${r.chosen.length} trecho(s) interligam todos os bairros, sem nenhuma ligação redundante.`)
+      : verdict('warn', `Cidade desconexa: ${r.componentCount} redes separadas`, `Não existe fibra única; o resultado é uma floresta geradora mínima com custo ${fmt(r.total)}.`);
+
+    const resumo = el('div', { class: 'result' }, v,
+      r.treatedAsUndirected ? note('Grafo direcionado: a fibra ignora o sentido das ruas (MST vale para grafos não-direcionados).', 'info') : null,
+      kpis(
+        kpi('custo total', fmt(r.total), 'good'),
+        kpi('trechos de fibra', r.chosen.length),
+        kpi('trechos descartados', r.table.filter((t) => t.status === 'rejeitada').length)),
+      section('Trechos escolhidos', 'Onde passar a fibra.',
         r.chosen.length
-          ? table(['#', 'Via', 'Custo'], [...r.chosen.map((e, i) => [i + 1, edgeName(g, e), fmt(g.weight(e))]), ['', 'TOTAL', fmt(r.total)]],
+          ? table(['#', 'Trecho', 'Custo'], [...r.chosen.map((e, i) => [i + 1, edgeName(g, e), fmt(g.weight(e))]), ['', 'TOTAL', fmt(r.total)]],
             { rowClass: (i) => (i === r.chosen.length ? 'total' : '') })
-          : note('Nenhuma aresta necessária.', 'info')),
-      block('Análise de todas as arestas (ordenadas por custo)',
-        table(['Via', 'Custo', 'Decisão'], r.table.map((t) => [edgeName(g, t.edge), fmt(t.w),
-          badge(t.status, t.status === 'aceita' ? 'ok' : t.status === 'rejeitada' ? 'bad' : 'neutral')]))),
-      block('Complexidade', complexity(r.complexity)));
+          : note('Nenhum trecho necessário.', 'info')));
+
+    const todas = el('div', { class: 'result' },
+      section('Decisão para cada rua', 'Ruas ordenadas pelo custo; é aceita se ligar redes ainda separadas e rejeitada se formar um anel.',
+        table(['Trecho', 'Custo', 'Decisão'], r.table.map((t) => [edgeName(g, t.edge), fmt(t.w),
+          badge(t.status, t.status === 'aceita' ? 'ok' : t.status === 'rejeitada' ? 'bad' : 'neutral')]))));
+
+    return tabs([
+      { label: 'Resumo', node: resumo }, { label: 'Todas as ruas', node: todas },
+      { label: 'Complexidade', node: complexity(r.complexity) }]);
   }
 
   /* ---------- Resiliência ---------- */
   function renderResilience(r, g) {
-    return el('div', { class: 'result' },
-      el('div', { class: 'kpis' },
+    const v = r.robust
+      ? verdict('ok', 'Rede resiliente', 'Nenhuma falha isolada de bairro ou rua desconecta a cidade.')
+      : verdict(r.connected ? 'warn' : 'bad', r.connected ? 'Existem pontos únicos de falha' : 'A rede já está fragmentada',
+        r.connected ? 'Se um destes pontos falhar, parte da cidade fica isolada. Reforce com rotas alternativas.' : 'Os pontos críticos abaixo valem para cada ilha.');
+
+    const resumo = el('div', { class: 'result' }, v,
+      r.treatedAsUndirected ? note('Grafo direcionado: análise sem considerar o sentido das ruas.', 'info') : null,
+      kpis(
         kpi('bairros críticos', r.pointRows.length, r.pointRows.length ? 'bad' : 'good'),
-        kpi('vias críticas', r.bridgeRows.length, r.bridgeRows.length ? 'bad' : 'good'),
-        kpi('componentes agora', r.baseline, r.connected ? 'good' : 'warn')),
-      r.robust ? note('Rede resiliente: nenhuma falha isolada de bairro ou via desconecta a cidade.', 'ok')
-        : note(r.connected ? 'Rede conexa, mas com pontos únicos de falha — reforce com rotas redundantes.' : 'A rede já está fragmentada; os pontos críticos abaixo valem para cada ilha.', 'warn'),
-      r.treatedAsUndirected ? note('Grafo direcionado: análise feita sem considerar o sentido das vias.', 'info') : null,
-      block('Bairros críticos (pontos de articulação)',
-        r.pointRows.length
-          ? table(['Bairro', 'Componentes se falhar', 'Tamanho dos blocos'], r.pointRows.map((p) => [badge(p.v, 'bad'), p.components, p.sizes.join(' + ')]))
-          : note('Nenhum.', 'ok')),
-      block('Vias críticas (pontes)',
-        r.bridgeRows.length
-          ? table(['Via', 'Componentes se fechar', 'Tamanho dos blocos'], r.bridgeRows.map((b) => [badge(edgeName(g, b.edge), 'bad'), b.components, b.sizes.join(' + ')]))
-          : note('Nenhuma.', 'ok')),
-      block('Complexidade', complexity(r.complexity)));
+        kpi('ruas críticas', r.bridgeRows.length, r.bridgeRows.length ? 'bad' : 'good'),
+        kpi('redes agora', r.baseline, r.connected ? 'good' : 'warn')),
+      r.pointRows.length ? section('Bairros críticos', 'Destacados em rosa no mapa.', chips(r.pointRows.map((p) => p.v))) : null,
+      r.bridgeRows.length ? section('Ruas críticas', 'Destacadas em rosa no mapa.', chips(r.bridgeRows.map((b) => edgeName(g, b.edge)))) : null);
+
+    const impacto = el('div', { class: 'result' },
+      section('Se um bairro falhar', 'Quantos blocos isolados restam e o tamanho de cada um.',
+        r.pointRows.length ? table(['Bairro', 'Blocos', 'Tamanhos'], r.pointRows.map((p) => [badge(p.v, 'bad'), p.components, p.sizes.join(' + ')])) : note('Nenhum bairro crítico.', 'ok')),
+      section('Se uma rua fechar', null,
+        r.bridgeRows.length ? table(['Rua', 'Blocos', 'Tamanhos'], r.bridgeRows.map((b) => [badge(edgeName(g, b.edge), 'bad'), b.components, b.sizes.join(' + ')])) : note('Nenhuma rua crítica.', 'ok')));
+
+    return tabs([
+      { label: 'Resumo', node: resumo }, { label: 'Impacto', node: impacto },
+      { label: 'Complexidade', node: complexity(r.complexity) }]);
   }
 
   function renderResult(r, g) {
-    if (!r.ok) return el('div', { class: 'result' }, note(r.error, 'bad'));
+    if (!r.ok) return el('div', { class: 'result' }, verdict('bad', 'Não foi possível executar', r.error));
     return ({ dfs: renderDfs, bfs: renderBfs, dijkstra: renderDijkstra, kruskal: renderKruskal, resilience: renderResilience })[r.algo](r, g);
   }
 
