@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SmartNet Analyzer · Infraestrutura de Cidades Inteligentes</title>
+  <meta name="description" content="Analisador de grafos para cidades inteligentes: DFS, BFS, Dijkstra, Kruskal e análise de resiliência sobre lista de adjacência implementada do zero.">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1220'/%3E%3Cpath d='M7 22 13 11l6 8 6-12' fill='none' stroke='%2322d3ee' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='7' cy='22' r='2.5' fill='%2334d399'/%3E%3Ccircle cx='25' cy='7' r='2.5' fill='%23fbbf24'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- ícones -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-dfs" viewBox="0 0 24 24"><path d="M12 3v5m0 0-5 5m5-5 5 5M7 13v4m10-4v4M12 8v0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="3.5" r="1.6" fill="currentColor"/><circle cx="7" cy="18" r="1.6" fill="currentColor"/><circle cx="17" cy="18" r="1.6" fill="currentColor"/></symbol>
+      <symbol id="i-bfs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="i-dijkstra" viewBox="0 0 24 24"><circle cx="5" cy="18" r="2" fill="currentColor"/><circle cx="19" cy="6" r="2" fill="currentColor"/><path d="M5 16V9a3 3 0 0 1 3-3h4m0 0 7 0M12 6l-2-2m2 2-2 2M7 18h6a3 3 0 0 0 3-3v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-kruskal" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2" fill="currentColor"/><circle cx="18" cy="8" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/><circle cx="19" cy="18" r="2" fill="currentColor"/><path d="M7.7 7l8.6 .8M7 8l.7 8M9.9 18H17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.4 2.9 8.3 7 10 4.1-1.7 7-5.6 7-10V6l-7-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5Z" fill="currentColor"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></symbol>
+      <symbol id="i-first" viewBox="0 0 24 24"><path d="M6 5v14M19 5v14L9 12l10-7Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-last" viewBox="0 0 24 24"><path d="M18 5v14M5 5v14l10-7L5 5Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 5v14L8 12l10-7Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 5v14l10-7L6 5Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    </defs>
+  </svg>
+
+  <a class="skip" href="#sec-map">Ir para o mapa</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="url(#lg)"/><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0e7490"/><stop offset="1" stop-color="#0b1220"/></linearGradient></defs><path d="M7 22 13 11l6 8 6-12" fill="none" stroke="#67e8f9" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="22" r="2.6" fill="#34d399"/><circle cx="25" cy="7" r="2.6" fill="#fbbf24"/></svg>
+      <div>
+        <h1>SmartNet <span>Analyzer</span></h1>
+        <p>Infraestrutura de cidades inteligentes · Análise e Complexidade de Algoritmos</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn btn-primary" id="btnPresetProf" type="button">Carregar Grafo de Teste do Professor</button>
+      <button class="btn btn-ghost" id="btnPresetCity" type="button">Cidade demo</button>
+      <button class="btn btn-ghost" id="btnClear" type="button">Limpar grafo</button>
+      <button class="btn btn-danger" id="btnFinish" type="button">Finalizar aplicação</button>
+    </div>
+  </header>
+
+  <div class="statusbar" id="statusbar" role="status" aria-live="polite"></div>
+
+  <main class="layout">
+    <!-- 1 · CONSTRUIR -->
+    <aside class="col-side">
+      <section class="panel" id="sec-build" aria-labelledby="h-build">
+        <header class="panel-head"><span class="step-no">1</span><div><h2 id="h-build">Mapear a cidade</h2><p>Bairros são vértices; vias, arestas.</p></div></header>
+
+        <div class="seg-row">
+          <div class="seg" role="group" aria-label="Tipo de via">
+            <button type="button" data-directed="false" aria-pressed="true">Não-direcionado</button>
+            <button type="button" data-directed="true" aria-pressed="false">Direcionado</button>
+          </div>
+          <div class="seg" role="group" aria-label="Pesos">
+            <button type="button" data-weighted="true" aria-pressed="true">Com pesos</button>
+            <button type="button" data-weighted="false" aria-pressed="false">Sem pesos</button>
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Forma de entrada">
+          <button role="tab" id="tab-form" aria-selected="true" aria-controls="pane-form" type="button">Formulário</button>
+          <button role="tab" id="tab-text" aria-selected="false" aria-controls="pane-text" type="button">Texto / Arquivo</button>
+        </div>
+
+        <div id="pane-form" role="tabpanel" aria-labelledby="tab-form">
+          <form id="formVertex" class="form-row" autocomplete="off">
+            <label class="field grow"><span>Novo bairro</span><input id="inVertex" type="text" placeholder="ex.: Centro, Porto" maxlength="120"></label>
+            <button class="btn btn-soft" type="submit">Adicionar</button>
+          </form>
+          <form id="formEdge" class="edge-form" autocomplete="off">
+            <label class="field"><span>Origem</span><input id="inFrom" list="dlVerts" type="text" placeholder="A" maxlength="24" required></label>
+            <label class="field"><span>Destino</span><input id="inTo" list="dlVerts" type="text" placeholder="B" maxlength="24" required></label>
+            <label class="field w-weight"><span>Peso</span><input id="inWeight" type="text" inputmode="decimal" placeholder="1" value="1"></label>
+            <button class="btn btn-soft" type="submit">Criar via</button>
+          </form>
+          <datalist id="dlVerts"></datalist>
+          <p class="feedback" id="feedbackForm" aria-live="polite"></p>
+
+          <h3 class="mini-h">Bairros <span id="countV" class="count">0</span></h3>
+          <div class="vchips" id="vertexChips"></div>
+          <h3 class="mini-h">Vias <span id="countE" class="count">0</span></h3>
+          <div class="edge-list" id="edgeList"></div>
+        </div>
+
+        <div id="pane-text" role="tabpanel" aria-labelledby="tab-text" hidden>
+          <label class="field"><span>Descrição do grafo</span>
+            <textarea id="graphText" rows="9" spellcheck="false" placeholder="direcionado: não&#10;pesos: sim&#10;O A 2&#10;O C 4&#10;vertices: Z"></textarea>
+          </label>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btnApplyText" type="button">Aplicar texto</button>
+            <label class="btn btn-soft file-btn">Abrir arquivo .txt<input id="fileInput" type="file" accept=".txt,.csv,.graph,text/plain"></label>
+            <button class="btn btn-ghost" id="btnSyncText" type="button">Usar grafo atual</button>
+            <button class="btn btn-ghost" id="btnDownload" type="button">Baixar .txt</button>
+          </div>
+          <ul class="feedback-list" id="textFeedback" aria-live="polite"></ul>
+          <details class="help">
+            <summary>Formato do arquivo</summary>
+<pre># comentário
+direcionado: não   # ou sim
+pesos: sim         # ou não
+vertices: X Y      # bairros isolados
+O A 2              # origem destino peso
+A -> B 7           # setas são aceitas
+C                  # um nome só = bairro</pre>
+          </details>
+        </div>
+      </section>
+    </aside>
+
+    <div class="col-main">
+      <!-- 2 · MAPA -->
+      <section class="panel" id="sec-map" aria-labelledby="h-map">
+        <header class="panel-head">
+          <span class="step-no">2</span><div><h2 id="h-map">Mapa da rede</h2><p>Arraste os bairros. Escolha o que o clique faz:</p></div>
+          <div class="head-tools">
+            <div class="seg seg-sm" role="group" aria-label="O que o clique faz">
+              <button type="button" data-mode="source" aria-pressed="true" title="Clique em um bairro define a origem">Origem</button>
+              <button type="button" data-mode="target" aria-pressed="false" title="Clique em um bairro define o destino (Dijkstra)">Destino</button>
+              <button type="button" data-mode="block" aria-pressed="false" title="Clique em uma via para interditá-la / liberá-la">Interditar vias</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btnRelayout" type="button">Reorganizar</button>
+          </div>
+        </header>
+        <div class="map-wrap">
+          <svg id="map" role="img" aria-label="Mapa do grafo da cidade"></svg>
+          <div class="map-empty" id="mapEmpty" hidden>
+            <div>
+              <h3>Sua cidade começa aqui</h3>
+              <p>Cadastre bairros e vias ao lado, importe um arquivo ou carregue um grafo pronto.</p>
+              <button class="btn btn-primary" id="btnEmptyPreset" type="button">Carregar Grafo de Teste do Professor</button>
+            </div>
+          </div>
+          <div class="map-hint" id="mapHint"></div>
+        </div>
+        <ul class="legend" aria-label="Legenda">
+          <li><i class="lg lg-current"></i>Atual</li>
+          <li><i class="lg lg-frontier"></i>Na fila / pilha</li>
+          <li><i class="lg lg-visited"></i>Visitado</li>
+          <li><i class="lg lg-mst"></i>Fibra (MST)</li>
+          <li><i class="lg lg-path"></i>Rota de emergência</li>
+          <li><i class="lg lg-crit"></i>Crítico</li>
+          <li><i class="lg lg-blocked"></i>Via interditada</li>
+        </ul>
+      </section>
+
+      <!-- 3 · ANALISAR -->
+      <section class="panel" id="sec-run" aria-labelledby="h-run">
+        <header class="panel-head"><span class="step-no">3</span><div><h2 id="h-run">Módulo de inteligência</h2><p>Escolha o algoritmo e execute sobre o grafo atual.</p></div></header>
+
+        <div class="algos" id="algoCards" role="radiogroup" aria-label="Algoritmo"></div>
+        <p class="algo-desc" id="algoDesc"></p>
+
+        <div class="params">
+          <label class="field" id="fldSource"><span>Origem</span><select id="selSource"></select></label>
+          <label class="field" id="fldTarget"><span>Destino <em>(opcional)</em></span><select id="selTarget"></select></label>
+          <label class="field" id="fldOrder"><span>Ordem dos vizinhos</span>
+            <select id="selOrder"><option value="insertion">Ordem de cadastro</option><option value="alpha">Alfabética</option></select>
+          </label>
+          <label class="check" id="fldAuto"><input type="checkbox" id="chkAuto" checked><span>Reproduzir passo a passo</span></label>
+          <div class="run-btns">
+            <button class="btn btn-primary btn-lg" id="btnRun" type="button">Executar</button>
+            <button class="btn btn-amber btn-lg" id="btnDispatch" type="button" hidden>🚑 Despachar veículo</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 · RESULTADOS -->
+      <section class="panel" id="sec-results" aria-labelledby="h-res">
+        <header class="panel-head"><span class="step-no">4</span><div><h2 id="h-res">Execução e resultados</h2><p id="resSub">Aguardando execução.</p></div></header>
+
+        <div class="player" id="player" aria-label="Controles de reprodução">
+          <div class="player-btns">
+            <button class="icon-btn" id="pFirst" type="button" title="Início" aria-label="Início"><svg><use href="#i-first"/></svg></button>
+            <button class="icon-btn" id="pPrev" type="button" title="Passo anterior" aria-label="Passo anterior"><svg><use href="#i-prev"/></svg></button>
+            <button class="icon-btn icon-btn-main" id="pPlay" type="button" title="Reproduzir" aria-label="Reproduzir"><svg><use href="#i-play"/></svg></button>
+            <button class="icon-btn" id="pNext" type="button" title="Próximo passo" aria-label="Próximo passo"><svg><use href="#i-next"/></svg></button>
+            <button class="icon-btn" id="pLast" type="button" title="Ver final" aria-label="Ver final"><svg><use href="#i-last"/></svg></button>
+          </div>
+          <label class="field speed"><span>Velocidade</span>
+            <select id="selSpeed"><option value="1600">Lenta</option><option value="900" selected>Normal</option><option value="400">Rápida</option></select>
+          </label>
+          <div class="player-info">
+            <div class="step-count" id="stepCount">Passo –</div>
+            <div class="progress"><i id="progressBar"></i></div>
+          </div>
+        </div>
+        <div class="step-box" id="stepBox"><p id="stepMsg">Escolha um algoritmo e execute para ver o passo a passo aqui.</p><dl id="stepAux"></dl></div>
+
+        <div id="resultBody" class="result-body"><div class="empty-mini">Nenhum resultado ainda.</div></div>
+      </section>
+
+      <!-- 5 · MEMÓRIA -->
+      <section class="panel" id="sec-memory" aria-labelledby="h-mem">
+        <header class="panel-head">
+          <span class="step-no">5</span><div><h2 id="h-mem">Dentro da memória</h2><p>Como o grafo está armazenado agora, em tempo real.</p></div>
+          <div class="head-tools">
+            <div class="seg seg-sm" role="group" aria-label="Visão da memória">
+              <button type="button" data-mem="list" aria-pressed="true">Lista de adjacência</button>
+              <button type="button" data-mem="matrix" aria-pressed="false">Matriz (derivada)</button>
+            </div>
+          </div>
+        </header>
+        <div id="memoryBody"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span>SmartNet Analyzer · Ibmec · Engenharia de Computação/Software · IBM3121 Análise e Complexidade de Algoritmos · Prof. Cassius Figueiredo</span>
+    <span>Lista de adjacência, heap e Union-Find implementados do zero · sem bibliotecas de grafos</span>
+  </footer>
+
+  <!-- encerramento -->
+  <div class="overlay" id="endOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <div class="end-card">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0e7490"/><path d="M7 22 13 11l6 8 6-12" fill="none" stroke="#67e8f9" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h2 id="endTitle">Aplicação finalizada</h2>
+      <p id="endSummary">A sessão foi encerrada e o grafo foi apagado da memória.</p>
+      <button class="btn btn-primary btn-lg" id="btnRestart" type="button">Iniciar nova análise</button>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="js/dom.js"></script>
+  <script src="js/graph.js"></script>
+  <script src="js/algorithms.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/presets.js"></script>
+  <script src="js/mapview.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
