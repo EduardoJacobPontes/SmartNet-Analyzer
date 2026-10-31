@@ -30,13 +30,17 @@
       svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
       this.gScenery = el('svg:g', { class: 'layer-scenery', 'aria-hidden': 'true' });
       this.gEdges = el('svg:g', { class: 'layer-edges' });
+      this.gLamps = el('svg:g', { class: 'layer-lamps', 'aria-hidden': 'true' });
       this.gNodes = el('svg:g', { class: 'layer-nodes' });
       this.gFx = el('svg:g', { class: 'layer-fx' });
       const defs = el('svg:defs', {},
         el('svg:linearGradient', { id: 'beamGrad', x1: 0, y1: 0, x2: 1, y2: 0 },
           el('svg:stop', { offset: '0', 'stop-color': '#fff3b0', 'stop-opacity': '.6' }),
-          el('svg:stop', { offset: '1', 'stop-color': '#fff3b0', 'stop-opacity': '0' })));
-      svg.append(defs, this.gScenery, this.gEdges, this.gNodes, this.gFx);
+          el('svg:stop', { offset: '1', 'stop-color': '#fff3b0', 'stop-opacity': '0' })),
+        el('svg:radialGradient', { id: 'lampGrad' },
+          el('svg:stop', { offset: '0', 'stop-color': '#ffd980', 'stop-opacity': '.42' }),
+          el('svg:stop', { offset: '1', 'stop-color': '#ffd980', 'stop-opacity': '0' })));
+      svg.append(defs, this.gScenery, this.gEdges, this.gLamps, this.gNodes, this.gFx);
 
       svg.addEventListener('pointermove', (e) => this._onMove(e));
       svg.addEventListener('pointerup', (e) => this._onUp(e));
@@ -173,7 +177,7 @@
     /* ---------- cenário: a cidadezinha vista de cima ---------- */
     /** Espalha árvores, casas, prédios, praças e lagos longe das ruas e dos bairros (determinístico). */
     buildScenery() {
-      clear(this.gScenery);
+      clear(this.gScenery); clear(this.gLamps);
       if (!this.graph || !this.graph.vertexCount) return;
       let seed = 20260;
       const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
@@ -181,10 +185,12 @@
 
       // ruas como polilinhas (curvas amostradas)
       const segs = [];
+      const straight = []; // ruas retas: recebem postes e carros estacionados
       for (const e of this.graph.edges) {
         const a = this.pos.get(e.u), b = this.pos.get(e.v);
         if (!a || !b) continue;
         const pts = [a];
+        if (!(this.graph.directed && this.graph.findEdge(e.v, e.u))) straight.push([a, b]);
         if (this.graph.directed && this.graph.findEdge(e.v, e.u)) {
           const dx = b.x - a.x, dy = b.y - a.y, len = Math.max(Math.hypot(dx, dy), 1);
           const c = { x: (a.x + b.x) / 2 - (dy / len) * 34, y: (a.y + b.y) / 2 + (dx / len) * 34 };
@@ -245,10 +251,11 @@
         this.gScenery.appendChild(g);
       };
       const tree = (x, y, r) => {
+        const autumn = rnd() < 0.13;
         const g = el('svg:g', { class: 'tree', transform: `translate(${x},${y})` },
           el('svg:circle', { class: 'sc-shadow', cx: 3, cy: 4, r }),
-          el('svg:circle', { class: 'tree-1', r }),
-          el('svg:circle', { class: 'tree-2', cx: -r * 0.28, cy: -r * 0.3, r: r * 0.68 }),
+          el('svg:circle', { class: autumn ? 'tree-1 autumn-1' : 'tree-1', r }),
+          el('svg:circle', { class: autumn ? 'tree-2 autumn-2' : 'tree-2', cx: -r * 0.28, cy: -r * 0.3, r: r * 0.68 }),
           el('svg:circle', { class: 'tree-3', cx: -r * 0.4, cy: -r * 0.42, r: r * 0.3 }));
         this.gScenery.appendChild(g);
       };
@@ -256,6 +263,40 @@
         this.gScenery.appendChild(el('svg:ellipse', { class: 'pond', cx: x, cy: y, rx, ry }));
         this.gScenery.appendChild(el('svg:ellipse', { class: 'pond-shine', cx: x - rx * 0.25, cy: y - ry * 0.3, rx: rx * 0.35, ry: ry * 0.2 }));
       };
+
+      const CARS = ['#d9534f', '#4f8fd9', '#e8e6df', '#3d424b', '#e0b73a', '#4fa56a', '#9b6bd1'];
+      const parked = (x, y, ang) => {
+        const g = el('svg:g', { class: 'parked', transform: `translate(${x},${y}) rotate(${(ang * 180) / Math.PI})` },
+          el('svg:rect', { class: 'sc-shadow', x: -8, y: -3, width: 17, height: 9, rx: 3 }),
+          el('svg:rect', { x: -8.5, y: -4.5, width: 17, height: 9, rx: 3, fill: pick(CARS), stroke: 'rgba(0,0,0,.45)', 'stroke-width': .6 }),
+          el('svg:rect', { class: 'parked-glass', x: -3, y: -3.4, width: 7, height: 6.8, rx: 1.4 }));
+        this.gScenery.appendChild(g);
+      };
+      for (let k = 0, made = 0; k < 120 && made < 12 && straight.length; k++) {
+        const [a, b] = pick(straight);
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (len < 170) continue;
+        const t = (R + 40) / len + rnd() * (1 - 2 * (R + 40) / len);
+        const ang = Math.atan2(b.y - a.y, b.x - a.x), side = rnd() < 0.5 ? 1 : -1;
+        const x = a.x + (b.x - a.x) * t - Math.sin(ang) * 21 * side, y = a.y + (b.y - a.y) * t + Math.cos(ang) * 21 * side;
+        if (!free(x, y, 10)) continue;
+        parked(x, y, ang); placed.push({ x, y, r: 10 }); made++;
+      }
+
+      // postes de luz alternando os lados, com poça de luz sobre a rua
+      for (const [a, b] of straight) {
+        const len = Math.hypot(b.x - a.x, b.y - a.y), ang = Math.atan2(b.y - a.y, b.x - a.x);
+        const usable = len - 2 * (R + 34);
+        if (usable < 40) continue;
+        const n = Math.max(1, Math.floor(usable / 105));
+        for (let i = 0; i < n; i++) {
+          const t = (R + 34 + (usable * (i + 0.5)) / n) / len, side = i % 2 ? 1 : -1;
+          const x = a.x + (b.x - a.x) * t - Math.sin(ang) * 18 * side, y = a.y + (b.y - a.y) * t + Math.cos(ang) * 18 * side;
+          this.gLamps.appendChild(el('svg:circle', { class: 'lamp-glow', cx: x, cy: y, r: 30 }));
+          this.gLamps.appendChild(el('svg:circle', { class: 'lamp', cx: x, cy: y, r: 2.4 }));
+          placed.push({ x, y, r: 6 });
+        }
+      }
 
       for (let tries = 0, count = 0; tries < 3200 && count < 190; tries++) {
         const x = 12 + rnd() * (W - 24), y = 12 + rnd() * (H - 24);

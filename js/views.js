@@ -256,16 +256,19 @@
         el('p', { class: 'mem-caption' }, 'Visão derivada: o grafo é armazenado em lista de adjacência; a matriz é calculada só para comparação.'));
     } else {
       body = el('div', { class: 'adj-list' },
-        el('div', { class: 'adj-legend' }, 'vetor de cabeças', el('span', {}, '→'), 'nós encadeados ', el('code', {}, '[destino | peso]')),
+        el('div', { class: 'adj-legend' },
+          el('span', { class: 'legend-tag' }, 'Como ler'),
+          'cada linha é um ', el('b', {}, 'bairro'), '; as ', el('b', { class: 'sign-word' }, 'placas verdes'),
+          ' são as ruas que saem dele: ', el('code', {}, 'para onde'), ' e, no círculo, o ', el('code', {}, 'custo'), '.'),
         [...g.adj.entries()].map(([v, list], idx) => el('div', { class: 'adj-row', 'data-vertex': v },
-          el('div', { class: 'adj-head' }, el('small', {}, idx), el('b', {}, v)),
+          el('div', { class: 'adj-head', title: `Posição ${idx} do vetor de listas` }, el('small', {}, idx), el('b', {}, v)),
           ...list.flatMap(({ to, edge }) => [
-            el('span', { class: 'adj-arrow' }, '→'),
-            el('div', { class: `adj-node${edge.blocked ? ' blocked' : ''}`, title: `via #${edge.id}${edge.blocked ? ' (interditada)' : ''}` },
+            el('span', { class: 'adj-road', 'aria-hidden': 'true' }),
+            el('div', { class: `adj-node${edge.blocked ? ' blocked' : ''}`, title: `rua #${edge.id}${edge.blocked ? ' (interditada)' : ''}` },
               el('b', {}, to), g.weighted ? el('em', {}, fmt(edge.w)) : null, el('small', {}, `#${edge.id}`)),
           ]),
-          el('span', { class: 'adj-arrow' }, list.length ? '→' : ''),
-          el('span', { class: 'adj-null' }, '∅'))));
+          el('span', { class: 'adj-road', 'aria-hidden': 'true' }),
+          el('span', { class: 'adj-end', title: 'fim da lista (ponteiro nulo)' }, '∅'))));
     }
 
     const why = el('div', { class: 'why' },
@@ -282,5 +285,21 @@
     container.querySelectorAll('[data-vertex]').forEach((n) => n.classList.toggle('active', n.dataset.vertex === vertex));
   }
 
-  Object.assign(root.SmartNet, { renderResult, renderMemory, highlightMemory, badge });
+  /** Estado vazio ilustrado: uma estradinha com o carro esperando. */
+  function emptyResult() {
+    const svg = document.createElementNS(root.SmartNet.SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 220 70');
+    svg.setAttribute('class', 'empty-art');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = '<path d="M10 48 C60 48 70 22 110 22 S170 48 210 48" fill="none" stroke="#5c616d" stroke-width="15" stroke-linecap="round"/>' +
+      '<path d="M10 48 C60 48 70 22 110 22 S170 48 210 48" fill="none" stroke="#23262c" stroke-width="12" stroke-linecap="round"/>' +
+      '<path d="M10 48 C60 48 70 22 110 22 S170 48 210 48" fill="none" stroke="#f5b82e" stroke-width="1.6" stroke-dasharray="6 6" stroke-linecap="round"/>' +
+      '<circle cx="14" cy="48" r="9" fill="#1b1d22" stroke="#f4f1e8" stroke-width="2.5"/><circle cx="206" cy="48" r="9" fill="#1b1d22" stroke="#f4f1e8" stroke-width="2.5"/>' +
+      '<g transform="translate(66 34) rotate(-28)"><rect x="-12" y="-6" width="24" height="12" rx="4" fill="#f5b82e" stroke="#7a5200" stroke-width="1"/><rect x="2" y="-4.5" width="6" height="9" rx="1.5" fill="#1b2430"/><circle cx="11" cy="-3.5" r="1.6" fill="#fff6c4"/><circle cx="11" cy="3.5" r="1.6" fill="#fff6c4"/></g>';
+    return el('div', { class: 'empty-result' }, svg,
+      el('strong', {}, 'Nenhum resultado ainda'),
+      el('p', {}, 'Escolha um algoritmo no passo ', el('b', {}, '3'), ' e clique em ', el('b', {}, 'Executar'), '. O carro vai passear pela cidade e o resultado aparece aqui.'));
+  }
+
+  Object.assign(root.SmartNet, { renderResult, renderMemory, highlightMemory, badge, emptyResult });
 })(typeof window !== 'undefined' ? window : globalThis);

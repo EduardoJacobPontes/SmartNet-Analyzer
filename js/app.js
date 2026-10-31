@@ -357,6 +357,7 @@
     $('fldTarget').hidden = !a.target;
     $('fldOrder').hidden = !a.order;
     $('btnRun').textContent = `Executar ${a.name}`;
+    updateDispatch();
   }
 
   /* ---------- execução ---------- */
@@ -367,15 +368,15 @@
     state.run = null;
     view.stopVehicle();
     view.applyState({});
-    mount($('resultBody'), el('div', { class: 'empty-mini' }, 'Nenhum resultado ainda. Escolha um algoritmo e execute.'));
+    mount($('resultBody'), S.emptyResult());
     $('resSub').textContent = 'Aguardando execução.';
     $('stepMsg').textContent = 'Escolha um algoritmo e execute para acompanhar o carro passo a passo.';
     mount($('stepAux'));
     mount($('stepLog'));
     $('stepCount').textContent = 'Passo –';
     $('progressBar').style.width = '0%';
-    $('btnDispatch').hidden = true;
     updatePlayer();
+    updateDispatch();
     S.highlightMemory($('memoryBody'), null);
   }
 
@@ -403,7 +404,7 @@
     mount($('stepLog'), res.ok ? res.steps.map((st, i) => el('li', {},
       el('button', { type: 'button', onclick: () => { stopPlay(); goTo(i); } }, el('i', {}, i + 1), el('span', {}, st.msg)))) : []);
     $('resSub').textContent = res.ok ? `${a.title} · ${a.theme} · origem ${res.source ?? '—'}` : 'A execução não pôde ser concluída.';
-    $('btnDispatch').hidden = !(res.ok && res.algo === 'dijkstra' && res.targetPath && res.targetPath.length > 1);
+    updateDispatch();
 
     if (!res.ok) {
       view.applyState({});
@@ -419,6 +420,22 @@
     if (auto) play();
   }
 
+  /** Botão da ambulância: só no Dijkstra; ligado quando existe uma rota até o destino. */
+  function updateDispatch() {
+    const btn = $('btnDispatch'), hint = $('dispatchHint');
+    const isDij = state.algo === 'dijkstra';
+    btn.hidden = !isDij;
+    hint.hidden = !isDij;
+    if (!isDij) return;
+    const res = state.run && state.run.res;
+    const ready = !!(res && res.ok && res.algo === 'dijkstra' && res.targetPath && res.targetPath.length > 1);
+    btn.disabled = !ready || !!state.driving;
+    if (ready) hint.textContent = `A ambulância vai de ${res.source} até ${res.target} pela rota mais rápida (custo ${fmt(res.targetCost)}). Aperte o botão e veja!`;
+    else if (res && res.ok && !res.target) hint.textContent = 'Para mandar a ambulância, escolha um Destino aqui em cima e execute o Dijkstra de novo.';
+    else if (res && res.ok && res.target && !res.targetPath) hint.textContent = 'Não existe caminho até esse destino, então a ambulância não consegue sair.';
+    else hint.textContent = 'Escolha Origem e Destino, clique em Executar Dijkstra e depois mande a ambulância seguir a rota mais rápida.';
+  }
+
   /* ---------- player ---------- */
   function goTo(i) {
     const run = state.run;
@@ -432,7 +449,7 @@
     $('progressBar').style.width = `${((run.idx + 1) / run.res.steps.length) * 100}%`;
     S.highlightMemory($('memoryBody'), step.current);
     const log = $('stepLog');
-    [...log.children].forEach((li, k) => li.classList.toggle('active', k === run.idx));
+    [...log.children].forEach((li, k) => { li.classList.toggle('active', k === run.idx); li.classList.toggle('past', k < run.idx); });
     const act = log.children[run.idx];
     if (act) { // rola só a lista (não a página)
       const top = act.offsetTop; // a lista é o offsetParent
@@ -490,18 +507,60 @@
     if (!run || !run.res.targetPath) return;
     stopPlay();
     goTo(run.res.steps.length - 1);
-    const btn = $('btnDispatch');
-    btn.disabled = true;
+    state.driving = true;
+    updateDispatch();
     view.placeCar(run.res.targetPath[0], { emergency: true });
     view.driveRoute(run.res.targetPath, { speed: 230, emergency: true }).then((arrived) => {
-      btn.disabled = false;
-      if (arrived) toast(`🚨 Viatura chegou a ${run.res.target}: ${run.res.targetPath.length - 1} trecho(s), custo ${fmt(run.res.targetCost)}.`, 'ok');
+      state.driving = false;
+      updateDispatch();
+      if (arrived) toast(`🚑 A ambulância chegou a ${run.res.target}! Foram ${run.res.targetPath.length - 1} rua(s) e custo ${fmt(run.res.targetCost)}.`, 'ok');
     });
   }));
 
   // mudar origem/destino/ordem invalida o resultado exibido, mas não apaga o grafo
   ['selSource', 'selTarget'].forEach((id) => $(id).addEventListener('change', endpointsPicked));
   $('selOrder').addEventListener('change', () => { if (state.run) clearRun(); });
+
+  /* ---------- ajuda para iniciantes ---------- */
+  const HELP = [
+    ['Monte a cidade', 'No quadro 1, escreva o nome de um bairro e aperte Adicionar. Depois crie uma rua: diga de qual bairro ela sai, para qual vai e quanto custa passar por ela.'],
+    ['Ou use um pronto', 'Aperte "Carregar Grafo de Teste do Professor" lá em cima para ganhar uma cidade já montada.'],
+    ['Olhe o mapa', 'No quadro 2 você vê a cidade de cima. Arraste os bairros para arrumar do seu jeito. Clique em um bairro para dizer de onde o carro sai.'],
+    ['Escolha um desafio', 'No quadro 3, cada cartão é um desafio diferente: passear pela cidade toda (DFS), espalhar um aviso (BFS), achar o caminho mais rápido (Dijkstra), passar a internet gastando pouco (Kruskal) ou ver o que acontece se algo quebrar (Resiliência).'],
+    ['Aperte Executar', 'Um carrinho passeia pelas ruas mostrando o que o computador está pensando. Use ▶ e ◀ para ir passo a passo.'],
+    ['Leia a resposta', 'No quadro 4, a caixa colorida diz a resposta em uma frase. As abas mostram os detalhes se você quiser saber mais.'],
+    ['Teste imprevistos', 'No mapa, escolha "Interditar vias" e clique numa rua para fechá-la, como uma obra. Tudo é recalculado na hora!'],
+    ['Terminou?', 'Aperte "Finalizar aplicação" para encerrar e apagar tudo.'],
+  ];
+  mount($('helpSteps'), HELP.map(([t, d]) => el('li', {}, el('strong', {}, t), el('p', {}, d))));
+  const openHelp = () => { $('helpOverlay').hidden = false; $('btnHelpOk').focus(); };
+  const closeHelp = () => { $('helpOverlay').hidden = true; $('btnHelp').focus(); };
+  $('btnHelp').addEventListener('click', openHelp);
+  $('btnHelpOk').addEventListener('click', closeHelp);
+  $('btnHelpClose').addEventListener('click', closeHelp);
+  $('helpOverlay').addEventListener('click', (e) => { if (e.target === $('helpOverlay')) closeHelp(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('helpOverlay').hidden) closeHelp(); });
+
+  /* ---------- horizonte do rodapé ---------- */
+  (function skyline() {
+    const svg = $('skyline');
+    let seed = 42;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    let x = -10;
+    while (x < 1210) {
+      const w = 22 + rnd() * 34, h = 18 + rnd() * 54;
+      svg.appendChild(el('svg:rect', { class: 'sky-b', x, y: 90 - h, width: w, height: h, rx: 1.5 }));
+      for (let wy = 90 - h + 6; wy < 84; wy += 9) for (let wx = x + 5; wx < x + w - 6; wx += 8) {
+        if (rnd() < 0.34) svg.appendChild(el('svg:rect', { class: 'sky-w', x: wx, y: wy, width: 3.2, height: 4.2, opacity: (0.35 + rnd() * 0.65).toFixed(2) }));
+      }
+      x += w + 2 + rnd() * 8;
+      if (rnd() < 0.3) { // uma árvore entre os prédios
+        const r = 6 + rnd() * 5;
+        svg.appendChild(el('svg:circle', { class: 'sky-t', cx: x + r, cy: 90 - r, r }));
+        x += r * 2 + 4;
+      }
+    }
+  })();
 
   /* ---------- início ---------- */
   renderAlgoCards();

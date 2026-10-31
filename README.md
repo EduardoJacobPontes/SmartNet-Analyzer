@@ -2,7 +2,7 @@
 
 Ferramenta web de análise de infraestrutura para **cidades inteligentes**: a cidade é um grafo (bairros = vértices, vias = arestas com custo/distância) sobre o qual rodam DFS, BFS, Dijkstra, Kruskal e uma análise extra de resiliência.
 
-**Demo (GitHub Pages):** https://hugowatzl.github.io/smartnet-analyzer/
+**Demo (GitHub Pages):** https://eduardojacobpontes.github.io/SmartNet-Analyzer/
 
 ## Identificação
 
@@ -19,7 +19,7 @@ Aplicação 100% estática (HTML + CSS + JavaScript puro, **sem build e sem depe
 
 - **Online:** abra o link do GitHub Pages acima.
 - **Local:** baixe/clone o repositório e abra `index.html` no navegador (duplo clique). Funciona via `file://`.
-- **Testes do núcleo (opcional, Node ≥ 16):** `node tests/run-tests.js`
+- **Testes (opcional, Node ≥ 16):** `node tests/run-tests.js` (casos conhecidos) e `node tests/fuzz.js` (validação cruzada em milhares de grafos aleatórios)
 
 ### Roteiro de uso
 1. **Mapear a cidade (1):** escolha *Direcionado/Não-direcionado* e *Com/Sem pesos*; cadastre bairros e vias pelo **formulário**, cole um **texto** ou abra um **arquivo .txt** (formato abaixo). Pesos das vias podem ser editados direto na lista.
@@ -53,6 +53,16 @@ Separadores: espaço, vírgula ou ponto-e-vírgula. Erros são listados por linh
 | Loop interativo / Finalizar | botões *Limpar grafo*, formulário, texto/arquivo e *Finalizar aplicação* |
 | Preset do professor | botão *Carregar Grafo de Teste do Professor* |
 
+### Como os cálculos são validados
+`tests/fuzz.js` gera milhares de grafos aleatórios (direcionados ou não, com/sem pesos, pesos zero, desconexos, vias interditadas, vértices isolados) e compara:
+- **Dijkstra** com Floyd–Warshall (distâncias, alcançabilidade e custo de cada caminho devolvido);
+- **BFS** com Floyd–Warshall de peso unitário;
+- **DFS** com a alcançabilidade e as propriedades da busca (cada vértice uma vez, intervalos aninhados, tempos 1..2V, componentes);
+- **Kruskal** com Prim e, em grafos pequenos, com força bruta sobre todos os subconjuntos de arestas;
+- **Pontos de articulação e pontes** com a remoção de cada vértice/aresta e recontagem de componentes.
+
+Os testes foram verificados injetando bugs de propósito (ordenação invertida, relaxamento errado, ponte errada, salto errado): todos foram detectados.
+
 ### Resultados esperados no grafo do professor (validados em `tests/`)
 - **Dijkstra (origem O):** A=2, B=4, C=4, D=8, E=7, F=14, T=13 (rota até T: O→A→B→D→T)
 - **Kruskal:** B–C(1), O–A(2), A–B(2), B–E(3), F–T(3), B–D(4), D–T(5) → **custo 20**
@@ -62,7 +72,7 @@ Separadores: espaço, vírgula ou ponto-e-vírgula. Erros são listados por linh
 ## Funcionalidades extras
 - **Interditar vias:** feche ruas no mapa; todos os algoritmos ignoram vias fechadas e **recalculam na hora** (rota de ambulância desvia, a fibra é reprojetada).
 - **Carro percorrendo o grafo:** a cada passo do DFS/BFS/Dijkstra um carro dirige pelas ruas até o bairro atual (inclusive as voltas do DFS), com faróis e curvas.
-- **Despachar viatura 🚨:** a viatura (sirene piscando) percorre a rota de emergência do Dijkstra, deixando rastro no mapa.
+- **Mandar a ambulância 🚑:** no Dijkstra, com origem e destino escolhidos, uma ambulância (sirene piscando) percorre a rota mais rápida, deixando rastro no mapa.
 - **Cidadezinha vista de cima:** o mapa é ambientado com árvores, casas, prédios, lagos e gramado ao redor das ruas (decorativos; os bairros são as rotatórias).
 - **Central de operações:** cada resultado começa por um veredito em linguagem simples, com abas (Resumo, detalhes, Complexidade) e um diário de bordo clicável com todos os passos.
 - **Malha viária:** vias desenhadas como ruas de asfalto com faixa central; interditadas ficam com barreira vermelha.
@@ -88,6 +98,9 @@ Separadores: espaço, vírgula ou ponto-e-vírgula. Erros são listados por linh
 - **Sem pesos:** todas as vias valem 1. **Laços** são rejeitados; via repetida atualiza o peso.
 - Empates no Kruskal seguem a ordem de cadastro das vias. Todo texto digitado entra no DOM por `textContent` (sem injeção de HTML).
 
+## Guia simples da interface
+Veja [GUIA-DO-SITE.md](GUIA-DO-SITE.md) (explicado passo a passo, como para uma criança de 8 anos) ou o botão **Como usar?** no site.
+
 ## Estrutura
 ```
 index.html          interface
@@ -99,5 +112,7 @@ js/presets.js       grafo do professor e cidade demo
 js/mapview.js       mapa SVG (layout, arraste, animação)
 js/views.js         tabelas de resultado e visão da memória
 js/app.js           controlador da interface
-tests/run-tests.js  testes do núcleo (node)
+tests/run-tests.js  testes de casos conhecidos (node)
+tests/fuzz.js       validação cruzada contra Floyd–Warshall, Prim e força bruta
+GUIA-DO-SITE.md     guia da interface explicado de forma simples
 ```
