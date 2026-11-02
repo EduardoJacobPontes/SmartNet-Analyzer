@@ -24,16 +24,16 @@
       name: 'Cidade de demonstração',
       directed: false,
       weighted: true,
-      vertices: ['Centro', 'Hospital', 'Porto', 'Aeroporto', 'Campus', 'Industrial', 'Jardins', 'Vila Nova', 'Ilha'],
+      vertices: ['Centro', 'Hospital', 'Porto', 'Aeroporto', 'Campus', 'Industrial', 'Jardins', 'VilaNova', 'Ilha'],
       edges: [
         ['Centro', 'Hospital', 3], ['Centro', 'Porto', 5], ['Centro', 'Campus', 4],
         ['Hospital', 'Jardins', 6], ['Porto', 'Industrial', 7], ['Campus', 'Jardins', 2],
         ['Campus', 'Industrial', 8], ['Jardins', 'Aeroporto', 9], ['Industrial', 'Aeroporto', 4],
-        ['Industrial', 'Vila Nova', 6], ['Vila Nova', 'Ilha', 5],
+        ['Industrial', 'VilaNova', 6], ['VilaNova', 'Ilha', 5],
       ],
       positions: {
         Centro: [420, 300], Hospital: [220, 170], Porto: [330, 520], Aeroporto: [820, 120],
-        Campus: [560, 170], Industrial: [650, 400], Jardins: [380, 60], 'Vila Nova': [860, 440], Ilha: [920, 580],
+        Campus: [560, 170], Industrial: [650, 400], Jardins: [380, 60], 'VilaNova': [860, 440], Ilha: [920, 580],
       },
     },
   };
