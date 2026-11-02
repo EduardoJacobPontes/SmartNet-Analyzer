@@ -158,4 +158,5 @@ js/app.js           controlador da interface
 tests/run-tests.js  testes de casos conhecidos (node)
 tests/fuzz.js       validação cruzada contra Floyd–Warshall, Prim e força bruta
 GUIA-DO-SITE.md     guia da interface explicado de forma simples
+ROTEIRO-APRESENTACAO.md  roteiro de 15 min, complexidade e perguntas esperadas
 ```
