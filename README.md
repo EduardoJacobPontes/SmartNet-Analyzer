@@ -80,6 +80,49 @@ Os testes foram verificados injetando bugs de propósito (ordenação invertida,
 - Player passo a passo com destaque no mapa e na linha da lista de adjacência.
 - Escolha entre ordem de cadastro ou alfabética dos vizinhos (DFS/BFS).
 
+## Entendendo cada parte da interface
+
+### Origem e destino: quem usa o quê?
+
+| Algoritmo | Origem | Destino | Por quê |
+|---|:---:|:---:|---|
+| **DFS** | usa | não usa | Explora a cidade a partir da origem; não procura um bairro específico. A origem define *onde começa* e, por isso, a ordem de visita e a árvore. |
+| **BFS** | usa | não usa | A onda de alerta sai da origem e alcança todos os bairros; mostra em quantos saltos cada um é atingido. |
+| **Dijkstra** | usa | **opcional** | Sempre calcula o menor custo da origem até **todos** os bairros. Se você escolher um destino, o site também destaca essa rota no mapa e libera o botão **Mandar a ambulância**. |
+| **Kruskal** | não usa | não usa | A fibra óptica é uma propriedade da cidade inteira (árvore geradora mínima); não depende de ponto de partida. |
+| **Resiliência** | não usa | não usa | Analisa a cidade toda em busca de pontos únicos de falha. |
+
+Ou seja: a **origem importa** para DFS, BFS e Dijkstra (em grafos não conexos ela decide quais bairros são alcançados; no DFS também muda a ordem). O **destino** só serve para o Dijkstra e é opcional. No mapa, o botão **Origem** define de onde o carro sai e o botão **Destino** define aonde se quer chegar.
+
+### Kruskal (rede de fibra óptica, árvore geradora mínima)
+Imagine que a prefeitura quer levar fibra óptica a **todos** os bairros gastando o mínimo. Cada rua tem um custo para instalar a fibra. O Kruskal:
+1. ordena todas as ruas da mais barata para a mais cara;
+2. percorre a lista e **aceita** uma rua se ela liga dois bairros que ainda não estavam conectados entre si (usando Union-Find);
+3. **rejeita** a rua se os dois bairros já estão ligados por outro caminho, pois isso só criaria um anel caro e inútil;
+4. para quando todos os bairros estão conectados.
+
+O resultado é a **MST (árvore geradora mínima)**: com V bairros, exatamente V−1 trechos, de menor custo total e sem redundância. No grafo do professor: 7 trechos, custo **20**. Se a cidade for desconexa, não existe árvore única; o site devolve uma **floresta** (um MST por ilha) e avisa. Em grafos direcionados a fibra ignora o sentido das ruas.
+
+### Resiliência (extra do projeto)
+Responde: **"se um bairro ou uma rua falhar, a cidade se parte em pedaços?"**
+- **Bairro crítico (ponto de articulação):** bairro que, se for removido (alagamento, queda de energia), deixa outros bairros sem comunicação.
+- **Rua crítica (ponte):** rua que, se for fechada (obra, acidente), desconecta parte da cidade.
+- O site mostra o **impacto**: quantos blocos isolados sobram e o tamanho de cada um. Os pontos críticos ficam em rosa no mapa.
+- Se nada for crítico, a rede é **resiliente**: sempre há rota alternativa.
+
+Usa o algoritmo de Tarjan (DFS com tempos de descoberta e *low-link*), em O(V+E). Combine com **Interditar vias**: feche ruas e veja a rede ficar mais frágil.
+
+### "Dentro da memória" (como o grafo é guardado)
+O grafo é armazenado como **lista de adjacência**, escrita do zero em [`js/graph.js`](js/graph.js). Na tela:
+- cada **linha** é um bairro (uma posição do vetor de listas, com seu índice);
+- as **placas verdes** em seguida são os nós da lista encadeada daquele bairro: cada nó guarda o **vizinho (para onde a rua vai)**, o **peso (círculo amarelo)** e o **id da via** (`#n`);
+- a **barreira listrada ∅** é o ponteiro nulo (fim da lista);
+- ruas interditadas aparecem em vermelho;
+- em grafos não-direcionados cada rua aparece **duas vezes** (uma em cada bairro das pontas), apontando para o mesmo registro de aresta, por isso os "nós nas listas" são 2E;
+- durante a execução, a linha do bairro atual **acende**.
+
+Há ainda a aba **Matriz (derivada)**, que desenha a mesma cidade como matriz V×V só para **comparação**: o programa guarda a lista, e a matriz é calculada na hora apenas para mostrar quanto espaço seria desperdiçado (a "ocupação da matriz" mostra a porcentagem de células usadas). O cartão final justifica a escolha da lista: cidades são grafos esparsos, então O(V+E) de espaço compensa os O(V²) da matriz.
+
 ## Complexidade e decisões de projeto
 
 | Algoritmo | Tempo | Espaço |
