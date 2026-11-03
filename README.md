@@ -11,7 +11,7 @@ Ferramenta web de análise de infraestrutura para **cidades inteligentes**: a ci
 | **Curso** | Engenharia de Computação / Software — Ibmec |
 | **Disciplina** | Análise e Complexidade de Algoritmos (IBM3121) — 2026.2 |
 | **Professor** | Cassius Figueiredo |
-| **Integrantes** | _Nome — Matrícula_ (preencher: até 5 integrantes) |
+| **Integrantes** | Eduardo Jacob , Lucca Cravo e Hugo Watzl  |
 
 ## Como executar
 
